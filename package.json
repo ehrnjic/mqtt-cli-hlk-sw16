@@ -1,0 +1,23 @@
+{
+  "name": "mqtt-cli-hlk-sw16",
+  "version": "1.0.0",
+  "description": "MQTT client for tranfsport msgs to/from TCP device",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ehrnjic/mqtt-cli-hlk-sw16.git"
+  },
+  "author": "ehrnjic",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ehrnjic/mqtt-cli-hlk-sw16/issues"
+  },
+  "homepage": "https://github.com/ehrnjic/mqtt-cli-hlk-sw16#readme",
+  "dependencies": {
+    "mqtt": "^3.0.0",
+    "net": "^1.0.2"
+  }
+}
