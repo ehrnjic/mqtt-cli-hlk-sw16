@@ -1,0 +1,13 @@
+{    
+    "configuration": {
+        "mqtt": {
+            "server": "mqtt://test.mosquitto.org",
+            "subCommandTopic": "cmnd",
+            "pubStatusTopic": "stat"
+        },
+        "board": {
+            "ipAddr": "192.168.1.9",
+            "tcpPort": 8080
+        }
+    }
+}
