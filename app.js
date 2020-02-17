@@ -3,47 +3,51 @@
 var mqtt = require('mqtt')
 var net = require('net')
 
-const mqtt_server = 'mqtt://test.mosquitto.org'
+// Load configurtion from file ./config/default.json
+const conf = require('config').get('configuration')
 
-var mqtt_client  = mqtt.connect(mqtt_server)
+// Init mqtt and net clients
+var mqtt_client  = mqtt.connect(conf.mqtt.server)
 var tcp_client = new net.Socket() 
 
-const mqtt_topic = 'sw16tests'
-const devTcpPort = 8080 
-const devIpAddr = '192.168.1.9'
+const cmndPwrTempl = [0xaa, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xbb]
 
-cmdOnOffTempl = [0xaa, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0xbb]
-
+// MQTT event handler CONNECT
 mqtt_client.on('connect', function () {
-  mqtt_client.subscribe(mqtt_topic, function (err) {
+  mqtt_client.subscribe(conf.mqtt.subCommandTopic, function (err) {
     if (!err) {
-      console.log('mqtt cli connected to server: ' + mqtt_server + ' and subscribed to topic: ' + mqtt_topic)
+      console.log('Connected to MQTT server: ' + conf.mqtt.server
+       + ' and subscribed to topic: ' + conf.mqtt.subCommandTopic)
     }
   })
 })
- 
-mqtt_client.on('message', function (mqtt_topic, message) {
-    console.log('topic: ' + mqtt_topic + ' message: ' + message)
-    buf = Buffer.from(cmdOnOffTempl)
-    buf[2] = message[0]
-    buf[3] = message[1]
-    console.log(buf)
-    tcp_client.write(buf)
-// mqtt_client.end()
+
+// MQTT event handler MESSAGE
+mqtt_client.on('message', function (topic, message) {
+  console.log('Received message: ' + message + ' on topic: ' + topic)
+  
+  var stringMessage = message.toString()
+  // If msg start with PWR that mean POWER command
+  if (stringMessage.substr(0,3) == 'PWR') {
+    var netPacket = Buffer.from(cmndPwrTempl)
+
+    // Now get 5-th char of msg - 0 = off, 1 = on
+    if (stringMessage.substr(4,1) == '0') {
+      netPacket[3] = 0x02
+    } else if (stringMessage.substr(4,1) == '1') {
+      netPacket[3] = 0x01
+    }
+
+    // Now get 7&8-th char of msg - 00 to 15 for relay 0 to 15
+    netPacket[2] = stringMessage.substr(6,2).toString(16)
+    
+    // Send cmnd via tcp to board
+    tcp_client.write(netPacket)
+  }
 })
 
-
-tcp_client.connect(devTcpPort, devIpAddr, function() {
-    console.log('Connected to device: ' + devIpAddr + ' tcp' + devTcpPort)
+tcp_client.connect(conf.board.tcpPort, conf.board.ipAddr, function() {
+    console.log('Connected to relay board: ' + conf.board.ipAddr + ' tcp' + conf.board.tcpPort
+  )
 })
-
-// tcp_client.on('data', function(data) {
-//     //var buf_in = Buffer.from(data, 'utf8')
-//     console.log('Received: ' + data)
-//     tcp_client.destroy(); // kill client after server's response
-// })
-
-tcp_client.on('close', function() {
-	console.log('Connection closed');
-});
