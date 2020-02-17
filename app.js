@@ -44,6 +44,7 @@ mqtt_client.on('message', function (topic, message) {
     
     // Send cmnd via tcp to board
     tcp_client.write(netPacket)
+    console.log('Send to board via tcp :' + netPacket.toString('hex'))
   }
 })
 
