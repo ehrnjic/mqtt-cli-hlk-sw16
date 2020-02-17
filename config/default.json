@@ -7,6 +7,7 @@
         },
         "board": {
             "ipAddr": "192.168.1.9",
+            "hostFqdn": "board.local",
             "tcpPort": 8080
         }
     }
