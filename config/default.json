@@ -1,9 +1,9 @@
 {    
     "configuration": {
         "mqtt": {
-            "server": "mqtt://test.mosquitto.org",
-            "subCommandTopic": "cmnd",
-            "pubStatusTopic": "stat"
+            "server": "mqtt://localhost",
+            "subCommandTopic": "hlksw16/cmnd",
+            "pubStatusTopic": "hlksw16/stat"
         },
         "board": {
             "ipAddr": "192.168.1.9",
