@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/ehrnjic/mqtt-cli-hlk-sw16#readme",
   "dependencies": {
+    "config": "^3.2.5",
     "mqtt": "^3.0.0",
     "net": "^1.0.2"
   }
