@@ -13,3 +13,5 @@
 4. Handle reconect to mqtt and device
 
 5. Handle errors
+
+6. Add log file outside container instead loging to console (use rotation policy for logs)
