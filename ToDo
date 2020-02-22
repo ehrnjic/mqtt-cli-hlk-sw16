@@ -1,0 +1,15 @@
+################
+### TechDebt ###
+################
+
+1. node mqtt client publish message doubled
+    - check client qos and retain policy
+
+2. Create config file outside container
+    - map bind volume to container
+
+3. Change container user (now is root)
+
+4. Handle reconect to mqtt and device
+
+5. Handle errors
