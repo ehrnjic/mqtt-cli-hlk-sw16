@@ -1,7 +1,7 @@
 {    
     "configuration": {
         "mqtt": {
-            "server": "mqtt://mqtt.home",
+            "server": "mqtt://docker.home",
             "subCommandTopic": "hlksw16/cmnd",
             "pubStatusTopic": "hlksw16/stat"
         },
