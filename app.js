@@ -1,91 +1,123 @@
-// MQTT client for transport messages to HLK-SW16 via TCP
+/*
+
+MQTT client for HLK-SW16_v3.1 relay board
+
+This client subscribe on some topic on MQTT broker and transform 
+received and implemented commands (PWR, ALL & STA) to MCU serial
+communication protocol and send it to board via TCP.
+
+*/
 
 var mqtt = require('mqtt')
 var net = require('net')
 
-// Load configurtion from file ./config/default.json
+// Load configuration from file (./config/default.conf)
 const conf = require('config').get('configuration')
 
+// Define serial protocol key values 
+const sndHead = 0xaa,
+      sndTail = 0xbb,
+      recHead = 0xcc,
+      recTail = 0xdd,
+      cmdChgStateOne = 0x0f,
+      cmdChgStateAllOn = 0x0a,
+      cmdChgStateAllOff = 0x0b,
+      cmdReqStatAll = 0x1e,
+      relOn = 0x01,
+      relOff = 0x02
+
+// Initialise packet (20 bytes) variable as a Buffer
+var initPacket = Buffer.alloc(20, 0x00)
+
+// Func to format send tcp packet
+function initSendPacket(buf) {
+    buf[0] = sndHead
+    buf[19] = sndTail
+    return buf
+}
+
+// Func to change state of single relay
+function singleRelayChgState(state, relay) {
+  var tcpPacket = initSendPacket(initPacket)
+  tcpPacket[1] = cmdChgStateOne
+  tcpPacket[2] = relay.toString('hex')
+  if (state == '0') {
+    tcpPacket[3] = relOff
+  } else if (state == '1') {
+    tcpPacket[3] = relOn
+  }
+  tcpClient.write(tcpPacket)
+  console.log('Send data to board: ' + tcpPacket.toString('hex'))
+}
+
+// Func to change state of all relays
+function allRelayChgState(state) {
+  var tcpPacket = initSendPacket(initPacket)
+  if (state == '0') {
+    tcpPacket[1] = cmdChgStateAllOff
+  } else if (state == '1') {
+    tcpPacket[1] = cmdChgStateAllOn
+  }
+  tcpClient.write(tcpPacket)
+  console.log('Send data to board: ' + tcpPacket.toString('hex'))
+}
+
+// Func to request state of relays on device and publish this state on mqtt topic 
+function allRelayReqState() {
+  var tcpPacket = initSendPacket(initPacket)
+  tcpPacket[1] = cmdReqStatAll
+  tcpClient.write(tcpPacket)
+  console.log('Send data to board: ' + tcpPacket.toString('hex'))
+}
+
 // Init mqtt and net clients
-var mqtt_client = mqtt.connect(conf.mqtt.server)
-var tcp_client = new net.Socket()
+var tcpClient = new net.Socket()
+tcpClient.connect(conf.board.tcpPort, conf.board.ipAddr, function () {
+    console.log('Connected to relay board: ' + conf.board.hostFqdn + ' tcp' + conf.board.tcpPort
+    )
+})
+var mqttClient = mqtt.connect(conf.mqtt.server)
 
-const sendPktTepl = [0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0xbb]
+// Define event handlers
 
+// Handle TCP event DATA
+tcpClient.on('data', function (data) {
+    console.log('Received data from board: ' + data.toString('hex'))
+    mqttClient.publish(conf.mqtt.pubStatusTopic, data.toString('hex').substr(4,32))
+        
+    var checksum = 0
+    for (i=1; i<18; i++) {
+      checksum += data[i]
+    }
+    // Something is wrong with checksum (Calc chksum + 2 = Rec chksum ?????)
+    console.log('Calculated checksum: ' + checksum.toString(16) + ' - Received checsum: ' 
+      + data[18].toString(16))
+  })
 
-// MQTT event handler CONNECT
-mqtt_client.on('connect', function () {
-  mqtt_client.subscribe(conf.mqtt.subCommandTopic, function (err) {
-    if (!err) {
-      console.log('Connected to MQTT server: ' + conf.mqtt.server
-        + ' and subscribed to topic: ' + conf.mqtt.subCommandTopic)
+// Handle MQTT event CONNECT and topic subscription
+mqttClient.on('connect', function () {
+    mqttClient.subscribe(conf.mqtt.subCommandTopic, function (err) {
+      if (!err) {
+        console.log('Connected to MQTT broker: ' + conf.mqtt.server
+          + ' and subscribed to topic: ' + conf.mqtt.subCommandTopic)
+      }
+    })
+  })
+
+// Handle MQTT event MESSAGE
+mqttClient.on('message', function (topic, message) {
+    console.log('Receive mqtt message: ' + message + ' on topic: ' + topic)
+
+    var mqttMsg = message.toString()
+
+    if (mqttMsg.substr(0,3) == 'PWR') {
+      singleRelayChgState(mqttMsg.substr(4,1), mqttMsg.substr(6,2))
+    }
+    if (mqttMsg.substr(0,3) == 'ALL') {
+      allRelayChgState(mqttMsg.substr(4,1))
+    }
+    if (mqttMsg.substr(0,3) == 'STA') {
+      allRelayReqState()
     }
   })
-})
-
-// MQTT event handler MESSAGE
-mqtt_client.on('message', function (topic, message) {
-  console.log('Received message: ' + message + ' on topic: ' + topic)
-
-  var stringMessage = message.toString()
-
-  // If msg start with PWR that mean POWER (0x10) command
-  var netPacket = Buffer.from(sendPktTepl)
-  if (stringMessage.substr(0, 3) == 'PWR') {
-    netPacket[1] = 0x0f
-
-    // Now get 5-th char oon
-    if (stringMessage.substr(4, 1) == '0') {
-      netPacket[3] = 0x02
-    } else if (stringMessage.substr(4, 1) == '1') {
-      netPacket[3] = 0x01
-    }
-
-    // Now get 7&8-th char of msg - 00 to 15 for relay 0 to 15
-    netPacket[2] = stringMessage.substr(6, 2).toString(16)
-
-    // Send cmnd via tcp to board
-    tcp_client.write(netPacket)
-    console.log('Send to board via tcp: ' + netPacket.toString('hex'))
-  }
-
-  // If msg start with ALL that mean POWER ON ALL (param=1) or OFF (param=0)
-  if (stringMessage.substr(0, 3) == "ALL") {
-    if (stringMessage.substr(4, 1) == "1") {
-      netPacket[1] = 0x0a
-      netPacket[2] = 0x03
-      tcp_client.write(netPacket)
-      console.log('Send to board via tcp :' + netPacket.toString('hex'))
-    } else if (stringMessage.substr(4, 1) == "0") {
-      netPacket[1] = 0x0b
-      tcp_client.write(netPacket)
-      console.log('Send to board via tcp :' + netPacket.toString('hex'))
-    }
-  }
-
-  if (stringMessage.substr(0, 3) == "STA") {
-    netPacket[1] = 0x1c
-    tcp_client.write(netPacket)
-    console.log('Send to board via tcp :' + netPacket.toString('hex'))
-  }
-})
-
-
-
-// TCP event handler CONNECT
-tcp_client.connect(conf.board.tcpPort, conf.board.ipAddr, function () {
-  console.log('Connected to relay board: ' + conf.board.ipAddr + ' tcp' + conf.board.tcpPort
-  )
-})
-
-// TCP event handler DATA
-tcp_client.on('data', function (data) {
-  console.log('Received data from board: ' + data.toString('hex'))
-  var checksum = 0
-  for (i=1; i<18; i++) {
-    checksum += data[i]
-  }
-  console.log('Received data checksum: ' + checksum.toString(16) + ' is ' 
-    + data[18].toString(16))
-})
+  
