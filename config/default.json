@@ -1,13 +1,13 @@
 {    
     "configuration": {
         "mqtt": {
-            "server": "mqtt://localhost",
+            "server": "mqtt://mqtt.home",
             "subCommandTopic": "hlksw16/cmnd",
             "pubStatusTopic": "hlksw16/stat"
         },
         "board": {
-            "ipAddr": "192.168.1.99",
-            "hostFqdn": "board.local",
+            "ipAddr": "192.168.0.152",
+            "hostFqdn": "hlk-sw16-kotl.home",
             "tcpPort": 9876
         }
     }
